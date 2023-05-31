@@ -8,6 +8,7 @@ public class carEngine : MonoBehaviour
     public Transform path;
     private int currentNode = 0;
     private List<Transform> nodes = new List<Transform>();
+
     private void Start()
     {
         Transform[] pathTransform = path.GetComponentsInChildren<Transform>();
@@ -20,7 +21,9 @@ public class carEngine : MonoBehaviour
                 nodes.Add(pathTransform[i]);
             }
         }
+        GetComponent<Rigidbody>().centerOfMass = centerOfMass;
     }
+    public Vector3 centerOfMass; 
         // Update is called once per frame
         void Update()
     {
@@ -28,11 +31,13 @@ public class carEngine : MonoBehaviour
     }
     private void FixedUpdate()
     {
+        Sensors();
         ApplySteer();
         Drive();
         CheckPointDistance();
+        Breaking();
     }
-
+    
     private void CheckPointDistance()
     {
         if(Vector3.Distance(transform.position, nodes[currentNode].position) < 0.5f)
@@ -53,7 +58,7 @@ public class carEngine : MonoBehaviour
     private void Drive()
     {
         currentSpeed = 2 * Mathf.PI * wheelFrontLeft.radius * wheelFrontLeft.rpm * 60 / 100;
-        if(currentSpeed <maxSpeed)
+        if(currentSpeed <maxSpeed && !isBreaking)
         {
             wheelFrontLeft.motorTorque = maxMotorTorque;
             wheelFrontRight.motorTorque = maxMotorTorque;
@@ -80,4 +85,112 @@ public class carEngine : MonoBehaviour
         wheelFrontLeft.steerAngle = newSteer;
         wheelFrontRight.steerAngle = newSteer;
     }
+
+    //T-4
+    public bool isBreaking = false;
+    public WheelCollider wheelBackLeft;
+    public WheelCollider wheelBackRight;
+    
+    public float maxBreakTorque = 150f;
+    private void Breaking()
+    {
+        if (isBreaking)
+        {
+            wheelBackLeft.brakeTorque = maxBreakTorque;
+            wheelBackRight.brakeTorque = maxBreakTorque;
+        }
+        else
+        {
+            wheelBackLeft.brakeTorque = 0f;
+            wheelBackRight.brakeTorque = 0f;
+        }
+    }
+    [Header("Sensors")]
+    public float sensorLength = 5f;
+    public float frontSideSensorPosition = 0.2f;
+    public float frontSensorAngle = 30f;
+    public Vector3 frontSensorPosition = new Vector3(0f, 0.2f, 0.5f);
+
+
+    private bool avoid = false;
+    private void Sensors()
+    {
+        RaycastHit hit;
+        Vector3 sensorStarPose = transform.position;
+        sensorStarPose += transform.forward * frontSensorPosition.z;
+        sensorStarPose += transform.up * frontSensorPosition.y;
+        float avoidMultiplier = 0;
+        avoid = false;
+        
+        //Front Right
+        sensorStarPose += transform.right * frontSideSensorPosition;
+        if (Physics.Raycast(sensorStarPose, transform.forward, out hit, sensorLength))
+        {
+            if (hit.collider.CompareTag("Floor"))
+            {
+                Debug.DrawLine(sensorStarPose, hit.point);
+                avoid = true;
+                avoidMultiplier -= 1f;
+            }
+        }
+        //Right Angle
+        
+        else if (Physics.Raycast(sensorStarPose, Quaternion.AngleAxis(frontSensorAngle, transform.up)*transform.forward, out hit, sensorLength))
+        {
+            if (hit.collider.CompareTag("Floor"))
+            {
+                Debug.DrawLine(sensorStarPose, hit.point);
+                avoid = true;
+                avoidMultiplier -= 0.5f;
+            }
+        }
+        //Front Left
+        sensorStarPose -= transform.right * frontSideSensorPosition * 2;
+        if (Physics.Raycast(sensorStarPose,  transform.forward, out hit, sensorLength))
+        {
+            if (hit.collider.CompareTag("Floor"))
+            {
+                Debug.DrawLine(sensorStarPose, hit.point);
+                avoid = true;
+                avoidMultiplier += 1f;
+            }
+        }
+        //Front left angle
+        else if (Physics.Raycast(sensorStarPose, Quaternion.AngleAxis(-frontSensorAngle, transform.up) *
+        transform.forward, out hit, sensorLength))
+        {
+            if (hit.collider.CompareTag("Floor"))
+            {
+                Debug.DrawLine(sensorStarPose, hit.point);
+                avoid = true;
+                avoidMultiplier += 0.5f;
+            }
+        }
+        //Front
+        if (avoidMultiplier == 0)
+        {
+            if (Physics.Raycast(sensorStarPose, transform.forward, out hit, sensorLength))
+            {
+                if (hit.collider.CompareTag("Floor"))
+                {
+                    Debug.DrawLine(sensorStarPose, hit.point);
+                    avoid = true;
+                    if(hit.normal.x < 0)
+                    {
+                        avoidMultiplier = -1;
+                    }
+                    else
+                    {
+                        avoidMultiplier = 1;
+                    }
+                }
+            }
+        }
+        if (avoid)
+        {
+            wheelFrontLeft.steerAngle = maxSteerAngle * avoidMultiplier;
+            wheelFrontRight.steerAngle = maxSteerAngle * avoidMultiplier;
+        }
+    }
+
 }
