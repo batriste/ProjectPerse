@@ -5,12 +5,14 @@ using UnityEngine;
 
 public class carEngine : MonoBehaviour
 {
+    
     public Transform path;
-    private int currentNode = 0;
-    private List<Transform> nodes = new List<Transform>();
+    public int currentNode = 0;
+    public List<Transform> nodes = new List<Transform>();
 
     private void Start()
     {
+        
         Transform[] pathTransform = path.GetComponentsInChildren<Transform>();
         nodes = new List<Transform>();
 
@@ -37,10 +39,17 @@ public class carEngine : MonoBehaviour
         CheckPointDistance();
         Breaking();
     }
-    
+    public void OnCollisionStay(Collision coll)
+    {
+        //CarlosF
+        if (coll.gameObject.CompareTag("Obstacle")){
+            Reposition();
+        }
+    }
     private void CheckPointDistance()
     {
-        if(Vector3.Distance(transform.position, nodes[currentNode].position) < 0.5f)
+        
+        if (Vector3.Distance(transform.position, nodes[currentNode].position) < 0.9f)
         {
             if(currentNode == nodes.Count - 1)
             {
@@ -98,6 +107,7 @@ public class carEngine : MonoBehaviour
         {
             wheelBackLeft.brakeTorque = maxBreakTorque;
             wheelBackRight.brakeTorque = maxBreakTorque;
+            isBreaking = false;
         }
         else
         {
@@ -109,10 +119,12 @@ public class carEngine : MonoBehaviour
     public float sensorLength = 5f;
     public float frontSideSensorPosition = 0.2f;
     public float frontSensorAngle = 30f;
-    public Vector3 frontSensorPosition = new Vector3(0f, 0.2f, 0.5f);
+    public Vector3 frontSensorPosition = new Vector3(0f, 0.2f, 1.42f);
 
 
     private bool avoid = false;
+    //Temporidazor de respawn
+    public int temp = 50;
     private void Sensors()
     {
         RaycastHit hit;
@@ -128,44 +140,74 @@ public class carEngine : MonoBehaviour
         {
             if (hit.collider.CompareTag("Floor"))
             {
+                
                 Debug.DrawLine(sensorStarPose, hit.point);
                 avoid = true;
                 avoidMultiplier -= 1f;
+                
+            }
+            else
+            {
+                //isBreaking = true;
             }
         }
-        //Right Angle
         
+        //Right Angle
+
         else if (Physics.Raycast(sensorStarPose, Quaternion.AngleAxis(frontSensorAngle, transform.up)*transform.forward, out hit, sensorLength))
         {
             if (hit.collider.CompareTag("Floor"))
             {
                 Debug.DrawLine(sensorStarPose, hit.point);
+                
                 avoid = true;
                 avoidMultiplier -= 0.5f;
+               
+            }
+            else
+            {
+                //isBreaking = true;
             }
         }
+        
         //Front Left
         sensorStarPose -= transform.right * frontSideSensorPosition * 2;
         if (Physics.Raycast(sensorStarPose,  transform.forward, out hit, sensorLength))
         {
             if (hit.collider.CompareTag("Floor"))
             {
+                
                 Debug.DrawLine(sensorStarPose, hit.point);
                 avoid = true;
                 avoidMultiplier += 1f;
+                
+            }
+            else
+            {
+                //isBreaking = true;
+
             }
         }
+        
         //Front left angle
         else if (Physics.Raycast(sensorStarPose, Quaternion.AngleAxis(-frontSensorAngle, transform.up) *
         transform.forward, out hit, sensorLength))
         {
             if (hit.collider.CompareTag("Floor"))
             {
+                Debug.Log("Hola");
                 Debug.DrawLine(sensorStarPose, hit.point);
                 avoid = true;
                 avoidMultiplier += 0.5f;
+                
+            }
+            else
+            {
+                //isBreaking = true;
+
             }
         }
+        
         //Front
         if (avoidMultiplier == 0)
         {
@@ -174,7 +216,7 @@ public class carEngine : MonoBehaviour
                 if (hit.collider.CompareTag("Floor"))
                 {
                     Debug.DrawLine(sensorStarPose, hit.point);
-                    avoid = true;
+                    avoid = true;temp = 5;
                     if(hit.normal.x < 0)
                     {
                         avoidMultiplier = -1;
@@ -183,14 +225,64 @@ public class carEngine : MonoBehaviour
                     {
                         avoidMultiplier = 1;
                     }
+                }else
+                {
+                   // isBreaking = true;
+
                 }
+                
             }
+            
         }
         if (avoid)
         {
             wheelFrontLeft.steerAngle = maxSteerAngle * avoidMultiplier;
             wheelFrontRight.steerAngle = maxSteerAngle * avoidMultiplier;
         }
-    }
+       
+        if (transform.rotation.z > 0.2f || transform.rotation.z < -0.2f || transform.rotation.x > 0.2f || transform.rotation.x < -0.2f)
+        {
+            
+            timerotation--;
+            if (timerotation <= 0)
+            {
 
+                Reposition();
+            }
+        }
+    }
+    public int timerotation = 5;
+    public void Reposition()
+    {
+        temp--;
+        if (temp <= 0 || timerotation <= 0)
+        {
+            
+            if (currentNode == 0)
+            {
+                
+                transform.position = nodes[23].position;
+                Vector3 eulerAngles = transform.eulerAngles;
+                eulerAngles.z = 0f;
+                eulerAngles.y = transform.eulerAngles.y;
+                eulerAngles.x = 0f;
+                transform.eulerAngles = eulerAngles;
+                temp = 30;
+                timerotation = 5;
+            }
+            else
+            {
+                transform.position = nodes[currentNode - 1].position;
+                Vector3 eulerAngles = transform.eulerAngles;
+                eulerAngles.z = 0f;
+                eulerAngles.x = 0f;
+                transform.eulerAngles = eulerAngles;
+                temp = 30;
+                timerotation = 5;
+            }
+            
+        }
+        currentSpeed = 0f;
+
+    }
 }
